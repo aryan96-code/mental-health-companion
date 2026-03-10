@@ -34,8 +34,18 @@
     <main class="app-main">
       <!-- Dashboard -->
       <section id="dashboard" class="view active-view">
-        <h1>Welcome, friend</h1>
-        <p class="subtitle">A gentle space to check in, breathe, and connect.</p>
+        <div class="card emotional-hero">
+          <p id="greetingText" class="hero-greeting">Good Evening 👋</p>
+          <h1 class="hero-title">How are you feeling today?</h1>
+          <p class="subtitle hero-subtitle">Pick what feels closest. You can always adjust in the full mood check-in.</p>
+          <div class="emotion-row" id="emotionRow">
+            <button class="emotion-btn" data-mood-value="9" aria-label="Very good">😀</button>
+            <button class="emotion-btn" data-mood-value="7" aria-label="Good">🙂</button>
+            <button class="emotion-btn" data-mood-value="5" aria-label="Neutral">😐</button>
+            <button class="emotion-btn" data-mood-value="3" aria-label="Low">😔</button>
+            <button class="emotion-btn" data-mood-value="1" aria-label="Very low">😢</button>
+          </div>
+        </div>
 
         <div class="grid">
           <div class="card">
@@ -44,6 +54,35 @@
               <p>No check-in yet. How are you feeling today?</p>
               <button class="primary-btn" data-target="mood">Check in now</button>
             </div>
+          </div>
+
+          <div class="card">
+            <h2>🧘 Breathing</h2>
+            <p class="feature-copy">Start a gentle 2-minute exercise to calm your body and mind.</p>
+            <button class="primary-btn" data-target="breathing">Start Breathing</button>
+          </div>
+
+          <div class="card">
+            <h2>📓 Journal</h2>
+            <p class="feature-copy">Write what you're feeling and get supportive feedback.</p>
+            <button class="primary-btn" data-target="crisis">Open Journal</button>
+          </div>
+
+          <div class="card">
+            <h2>💬 Peer Support</h2>
+            <p class="feature-copy">Talk anonymously with another student who can listen.</p>
+            <button class="primary-btn" data-target="peer">Connect Now</button>
+          </div>
+
+          <div class="card">
+            <h2>Today's Wellness Plan</h2>
+            <div id="dailyWellnessPlan" class="daily-plan"></div>
+          </div>
+
+          <div class="card">
+            <h2>Mood Calendar</h2>
+            <div id="dashboardHeatmap" class="heatmap dashboard-heatmap" aria-label="Mood calendar preview"></div>
+            <button class="secondary-btn" data-target="mood">Open Full Mood Calendar</button>
           </div>
 
           <div class="card">
@@ -56,18 +95,7 @@
           </div>
 
           <div class="card">
-            <h2>Quick Actions</h2>
-            <div class="quick-actions">
-              <button class="primary-btn" data-target="mood">Mood Tracker</button>
-              <button class="primary-btn" data-target="crisis">Crisis Support</button>
-              <button class="primary-btn" data-target="peer">Peer Support</button>
-              <button class="secondary-btn" data-target="breathing">Breathing Exercise</button>
-              <button class="secondary-btn" data-target="wellness">Wellness Activities</button>
-            </div>
-          </div>
-
-          <div class="card">
-            <h2>Quote of the Day</h2>
+            <h2>Today's Supportive Quote</h2>
             <p id="quoteText" class="quote-text"></p>
             <p id="quoteAuthor" class="quote-author"></p>
           </div>
@@ -322,6 +350,14 @@
     <button class="bottom-nav-btn" data-target="crisis">Crisis</button>
     <button class="bottom-nav-btn" data-target="wellness">Wellness</button>
   </nav>
+
+  <button id="supportFab" class="support-fab">💬 Need Support?</button>
+  <div id="supportMenu" class="support-menu hidden">
+    <button class="secondary-btn" data-target="breathing">🫁 Breathing</button>
+    <button class="secondary-btn" data-target="crisis">📓 Journal</button>
+    <button class="secondary-btn" data-target="peer">💬 Peer Support</button>
+    <button id="supportEmergencyBtn" class="emergency-btn">🚨 Emergency Help</button>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>

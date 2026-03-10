@@ -4,6 +4,7 @@
   const STORAGE_KEYS = {
     MOODS: 'ccc_moods',
     JOURNAL_ENTRIES: 'ccc_journal_entries',
+    WELLNESS_PLAN: 'ccc_wellness_plan',
     PEER_QUEUE: 'ccc_peer_queue',
     PEER_CHAT: 'ccc_peer_chat',
     COMFORT_MESSAGES: 'ccc_comfort_messages',
@@ -92,6 +93,13 @@
   const authButton = document.getElementById('authButton');
   const syncNowBtn = document.getElementById('syncNowBtn');
   const syncStatusText = document.getElementById('syncStatusText');
+  const greetingText = document.getElementById('greetingText');
+  const emotionRow = document.getElementById('emotionRow');
+  const dailyWellnessPlan = document.getElementById('dailyWellnessPlan');
+  const dashboardHeatmap = document.getElementById('dashboardHeatmap');
+  const supportFab = document.getElementById('supportFab');
+  const supportMenu = document.getElementById('supportMenu');
+  const supportEmergencyBtn = document.getElementById('supportEmergencyBtn');
   const authModal = document.getElementById('authModal');
   const closeAuthModal = document.getElementById('closeAuthModal');
   const authForm = document.getElementById('authForm');
@@ -190,6 +198,9 @@
       if (nav && nav.classList.contains('open')) {
         nav.classList.remove('open');
       }
+      if (supportMenu && !supportMenu.classList.contains('hidden')) {
+        supportMenu.classList.add('hidden');
+      }
     });
   });
 
@@ -229,6 +240,26 @@
       runCloudSync('manual').catch((error) => {
         console.error('Manual sync failed', error);
       });
+    });
+  }
+
+  if (supportFab && supportMenu) {
+    supportFab.addEventListener('click', () => {
+      supportMenu.classList.toggle('hidden');
+    });
+
+    document.addEventListener('click', (e) => {
+      const target = e.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (supportFab.contains(target) || supportMenu.contains(target)) return;
+      supportMenu.classList.add('hidden');
+    });
+  }
+
+  if (supportEmergencyBtn) {
+    supportEmergencyBtn.addEventListener('click', () => {
+      if (supportMenu) supportMenu.classList.add('hidden');
+      openEmergencyModal();
     });
   }
 
@@ -346,6 +377,17 @@
 
   renderQuoteOfTheDay();
 
+  function renderGreeting() {
+    if (!greetingText) return;
+    const hour = new Date().getHours();
+    let salutation = 'Good Evening';
+    if (hour < 12) salutation = 'Good Morning';
+    else if (hour < 17) salutation = 'Good Afternoon';
+    greetingText.textContent = `${salutation} 👋`;
+  }
+
+  renderGreeting();
+
   // ==== Mood Tracking ====
   const moodSlider = document.getElementById('moodSlider');
   const moodValueLabel = document.getElementById('moodValue');
@@ -362,6 +404,27 @@
   const moodDayDetails = document.getElementById('moodDayDetails');
 
   let moodTrendChart;
+
+  function getMoodDescriptor(mood) {
+    const m = Number(mood) || 0;
+    if (m <= 2) return { emoji: '😢', label: 'Very Low' };
+    if (m <= 4) return { emoji: '😔', label: 'Low' };
+    if (m <= 6) return { emoji: '😐', label: 'Steady' };
+    if (m <= 8) return { emoji: '🙂', label: 'Calm' };
+    return { emoji: '😀', label: 'Great' };
+  }
+
+  function getEnergyVisual(energy) {
+    if (energy === 'Low') return '⚡ Low';
+    if (energy === 'High') return '⚡ High';
+    return '⚡ Medium';
+  }
+
+  function getStressVisual(stress) {
+    if (stress === 'Low') return '🌤 Low';
+    if (stress === 'High') return '🌧 High';
+    return '🌥 Medium';
+  }
 
   function getMoodEmoji(mood) {
     const m = Number(mood) || 0;
@@ -383,6 +446,21 @@
     moodSlider.addEventListener('input', () => {
       moodValueLabel.textContent = moodSlider.value;
       updateMoodSliderVisual(moodSlider.value);
+    });
+  }
+
+  if (emotionRow) {
+    emotionRow.addEventListener('click', (e) => {
+      const target = e.target;
+      if (!(target instanceof HTMLElement)) return;
+      const moodValue = target.getAttribute('data-mood-value');
+      if (!moodValue) return;
+      if (moodSlider) {
+        moodSlider.value = moodValue;
+        if (moodValueLabel) moodValueLabel.textContent = moodValue;
+        updateMoodSliderVisual(moodValue);
+      }
+      showView('mood');
     });
   }
 
@@ -511,8 +589,10 @@
       setSyncStatus(`Synced at ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`, false);
       renderTodayMoodStatus();
       renderMoodHeatmap();
+      renderDashboardHeatmap();
       if (currentViewId === 'mood') renderMoodTrendChart();
       renderProgressSnapshot();
+      renderDailyWellnessPlan();
       renderJournalHistory();
       renderComfortMessages();
     } catch (error) {
@@ -620,9 +700,12 @@
       return;
     }
 
+    const moodDescriptor = getMoodDescriptor(latest.mood);
+
     todayMoodStatus.innerHTML = `
-      <p>Today's mood: <strong>${latest.mood}/10</strong></p>
-      <p>Energy: <strong>${latest.energy}</strong> · Stress: <strong>${latest.stress}</strong></p>
+      <p>Mood: <strong>${moodDescriptor.emoji} ${moodDescriptor.label}</strong></p>
+      <p>Energy: <strong>${getEnergyVisual(latest.energy)}</strong></p>
+      <p>Stress: <strong>${getStressVisual(latest.stress)}</strong></p>
       ${latest.note ? `<p>Note: <strong>${latest.note}</strong></p>` : ''}
       <p style="font-size:0.85rem;color:var(--text-muted);">Last updated at ${new Date(
         latest.timestamp
@@ -682,6 +765,88 @@
       <div class="snapshot-row"><span>7-day mood average</span><strong>${stats.average7Day ? stats.average7Day.toFixed(1) : 'N/A'}/10</strong></div>
       <div class="snapshot-row"><span>Total check-in days</span><strong>${stats.total}</strong></div>
     `;
+  }
+
+  function getTodayWellnessPlan() {
+    const todayKey = getTodayKey(new Date());
+    const stored = loadJSON(STORAGE_KEYS.WELLNESS_PLAN, null);
+    if (stored && stored.dateKey === todayKey && Array.isArray(stored.tasks)) {
+      return stored;
+    }
+    const fresh = {
+      dateKey: todayKey,
+      tasks: [
+        { id: 'water', label: 'Drink water', completed: false },
+        { id: 'breathing', label: '5 minute breathing', completed: false },
+        { id: 'gratitude', label: 'Write 3 gratitudes', completed: false },
+        { id: 'walk', label: 'Go for a short walk', completed: false },
+      ],
+    };
+    saveJSON(STORAGE_KEYS.WELLNESS_PLAN, fresh);
+    return fresh;
+  }
+
+  function renderDailyWellnessPlan() {
+    if (!dailyWellnessPlan) return;
+    const plan = getTodayWellnessPlan();
+    dailyWellnessPlan.innerHTML = '';
+    plan.tasks.forEach((task) => {
+      const row = document.createElement('label');
+      row.className = `daily-plan-item${task.completed ? ' completed' : ''}`;
+
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.checked = task.completed;
+      input.addEventListener('change', () => {
+        task.completed = input.checked;
+        saveJSON(STORAGE_KEYS.WELLNESS_PLAN, plan);
+        row.classList.toggle('completed', task.completed);
+      });
+
+      const text = document.createElement('span');
+      text.textContent = task.label;
+
+      row.appendChild(input);
+      row.appendChild(text);
+      dailyWellnessPlan.appendChild(row);
+    });
+  }
+
+  function renderDashboardHeatmap() {
+    if (!dashboardHeatmap) return;
+    const moods = loadMoods();
+    const latestByDay = new Map();
+    moods.forEach((entry) => {
+      if (!entry.dateKey) return;
+      const existing = latestByDay.get(entry.dateKey);
+      if (!existing || new Date(entry.timestamp || 0) >= new Date(existing.timestamp || 0)) {
+        latestByDay.set(entry.dateKey, entry);
+      }
+    });
+
+    dashboardHeatmap.innerHTML = '';
+    const today = new Date();
+    for (let i = 20; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const key = getTodayKey(d);
+      const entry = latestByDay.get(key);
+      const cell = document.createElement('div');
+      cell.className = 'heatmap-cell';
+      const inner = document.createElement('div');
+      inner.className = 'heatmap-cell-inner';
+      if (!entry) {
+        cell.classList.add('empty');
+      } else {
+        const mood = Number(entry.mood) || 0;
+        if (mood <= 3) inner.style.background = '#ef4444';
+        else if (mood <= 7) inner.style.background = '#facc15';
+        else inner.style.background = '#22c55e';
+      }
+      cell.title = entry ? `${d.toLocaleDateString()} ${getMoodDescriptor(entry.mood).emoji}` : `${d.toLocaleDateString()} no entry`;
+      cell.appendChild(inner);
+      dashboardHeatmap.appendChild(cell);
+    }
   }
 
   function getMoodSuggestion(mood, energy, stress) {
@@ -865,6 +1030,7 @@
       saveMoodEntry(entry);
       renderTodayMoodStatus();
       renderMoodHeatmap();
+      renderDashboardHeatmap();
       renderMoodTrendChart();
       renderProgressSnapshot();
       renderMoodInsight(entry);
@@ -874,8 +1040,10 @@
 
   renderTodayMoodStatus();
   renderMoodHeatmap();
+  renderDashboardHeatmap();
   renderMoodTrendChart();
   renderProgressSnapshot();
+  renderDailyWellnessPlan();
 
   if (exportDataBtn) {
     exportDataBtn.addEventListener('click', () => {
@@ -1497,5 +1665,6 @@
     closeEmergencyModal();
     closeOnboarding();
     closeAuthModalUI();
+    if (supportMenu) supportMenu.classList.add('hidden');
   });
 })();

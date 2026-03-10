@@ -162,6 +162,91 @@ h2 {
   color: var(--text-muted);
 }
 
+.emotional-hero {
+  margin-bottom: 16px;
+  background: linear-gradient(140deg, rgba(74, 144, 226, 0.12), rgba(126, 211, 33, 0.1), rgba(255, 255, 255, 0.9));
+}
+
+body.dark .emotional-hero {
+  background: linear-gradient(140deg, rgba(56, 189, 248, 0.2), rgba(34, 197, 94, 0.14), rgba(15, 23, 42, 0.95));
+}
+
+.hero-greeting {
+  margin: 0 0 6px;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+.hero-title {
+  margin-top: 0;
+}
+
+.hero-subtitle {
+  margin-bottom: 12px;
+}
+
+.emotion-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.emotion-btn {
+  border: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  font-size: 1.5rem;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.08);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.2s ease;
+}
+
+.emotion-btn:hover {
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 12px 20px rgba(15, 23, 42, 0.14);
+}
+
+body.dark .emotion-btn {
+  background: rgba(2, 6, 23, 0.88);
+}
+
+.feature-copy {
+  margin: 6px 0 12px;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+}
+
+.daily-plan {
+  display: grid;
+  gap: 8px;
+}
+
+.daily-plan-item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border-radius: 10px;
+  background: rgba(74, 144, 226, 0.07);
+}
+
+body.dark .daily-plan-item {
+  background: rgba(56, 189, 248, 0.1);
+}
+
+.daily-plan-item input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--blue);
+}
+
+.daily-plan-item.completed span {
+  text-decoration: line-through;
+  opacity: 0.75;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -175,6 +260,12 @@ h2 {
   padding: 18px 18px 16px;
   position: relative;
   overflow: hidden;
+  transition: transform 0.24s ease, box-shadow 0.24s ease;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 14px 30px rgba(74, 144, 226, 0.18);
 }
 
 .card::before {
@@ -386,6 +477,10 @@ textarea {
   grid-template-columns: repeat(7, 1fr);
   gap: 4px;
   margin-top: 8px;
+}
+
+.dashboard-heatmap {
+  margin-bottom: 10px;
 }
 
 .heatmap-cell {
@@ -753,6 +848,34 @@ body.dark .chat-messages {
   color: var(--blue);
 }
 
+.support-fab {
+  position: fixed;
+  right: 16px;
+  bottom: 74px;
+  z-index: 45;
+  border: none;
+  border-radius: 999px;
+  padding: 11px 16px;
+  font-size: 0.9rem;
+  color: #ffffff;
+  background: linear-gradient(135deg, #0ea5e9, #2563eb);
+  box-shadow: 0 12px 22px rgba(37, 99, 235, 0.35);
+  cursor: pointer;
+}
+
+.support-menu {
+  position: fixed;
+  right: 16px;
+  bottom: 126px;
+  z-index: 45;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--card-bg);
+  box-shadow: var(--shadow-soft);
+}
+
 .breathing-fullscreen .breathing-card {
   min-height: calc(100vh - 96px);
   justify-content: center;
@@ -805,6 +928,33 @@ body.dark .chat-messages {
   }
 }
 
+.grid .card {
+  animation: gentle-rise 0.4s ease both;
+}
+
+.grid .card:nth-child(2) {
+  animation-delay: 0.04s;
+}
+
+.grid .card:nth-child(3) {
+  animation-delay: 0.08s;
+}
+
+.grid .card:nth-child(4) {
+  animation-delay: 0.12s;
+}
+
+@keyframes gentle-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @media (max-width: 720px) {
   .app-header {
     flex-wrap: wrap;
@@ -850,6 +1000,19 @@ body.dark .chat-messages {
 
   .grid {
     grid-template-columns: 1fr;
+  }
+
+  .support-fab {
+    right: 12px;
+    bottom: 72px;
+    font-size: 0.82rem;
+    padding: 10px 12px;
+  }
+
+  .support-menu {
+    right: 12px;
+    left: 12px;
+    bottom: 122px;
   }
 
   .card {
