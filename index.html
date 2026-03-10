@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CampusCare Companion</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div id="app" class="app">
+    <header class="app-header">
+      <div class="logo">CampusCare Companion</div>
+      <button id="navToggle" class="nav-toggle" aria-label="Toggle navigation">
+        ☰
+      </button>
+      <nav class="nav">
+        <button class="nav-link" data-target="dashboard">Home</button>
+        <button class="nav-link" data-target="mood">Mood Tracker</button>
+        <button class="nav-link" data-target="crisis">Crisis Support</button>
+        <button class="nav-link" data-target="peer">Peer Support</button>
+        <button class="nav-link" data-target="breathing">Breathing</button>
+        <button class="nav-link" data-target="wellness">Wellness</button>
+      </nav>
+      <div class="header-actions">
+        <button id="darkModeToggle" class="secondary-btn">Dark Mode</button>
+        <button id="emergencyButton" class="emergency-btn">Emergency</button>
+      </div>
+    </header>
+
+    <main class="app-main">
+      <!-- Dashboard -->
+      <section id="dashboard" class="view active-view">
+        <h1>Welcome, friend</h1>
+        <p class="subtitle">A gentle space to check in, breathe, and connect.</p>
+
+        <div class="grid">
+          <div class="card">
+            <h2>Today's Mood</h2>
+            <div id="todayMoodStatus" class="today-mood-status">
+              <p>No check-in yet. How are you feeling today?</p>
+              <button class="primary-btn" data-target="mood">Check in now</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>Progress Snapshot</h2>
+            <div id="progressSnapshot" class="progress-snapshot">
+              <p class="feedback-text">Start with your first check-in to unlock insights.</p>
+            </div>
+            <button id="exportDataBtn" class="secondary-btn">Export My Data</button>
+          </div>
+
+          <div class="card">
+            <h2>Quick Actions</h2>
+            <div class="quick-actions">
+              <button class="primary-btn" data-target="mood">Mood Tracker</button>
+              <button class="primary-btn" data-target="crisis">Crisis Support</button>
+              <button class="primary-btn" data-target="peer">Peer Support</button>
+              <button class="secondary-btn" data-target="breathing">Breathing Exercise</button>
+              <button class="secondary-btn" data-target="wellness">Wellness Activities</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>Quote of the Day</h2>
+            <p id="quoteText" class="quote-text"></p>
+            <p id="quoteAuthor" class="quote-author"></p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Mood Tracking -->
+      <section id="mood" class="view">
+        <h1>Mood Check-in</h1>
+        <p class="subtitle">Take a moment to notice how you're doing today.</p>
+
+        <div class="card">
+          <form id="moodForm" class="mood-form">
+            <label>
+              Mood (1 = very low, 10 = very high)
+              <input type="range" id="moodSlider" min="1" max="10" value="5" />
+              <span id="moodValue">5</span>
+            </label>
+
+            <label>
+              Energy
+              <select id="energySelect">
+                <option>Low</option>
+                <option selected>Medium</option>
+                <option>High</option>
+              </select>
+            </label>
+
+            <label>
+              Stress
+              <select id="stressSelect">
+                <option>Low</option>
+                <option selected>Medium</option>
+                <option>High</option>
+              </select>
+            </label>
+
+            <label>
+              Notes (optional)
+              <textarea id="moodNoteInput" rows="3" placeholder="What might be shaping your mood today?"></textarea>
+            </label>
+
+            <button type="submit" class="primary-btn" id="quickCheckInBtn">Quick Check-in</button>
+            <p id="moodInsight" class="feedback-text"></p>
+          </form>
+        </div>
+
+        <div class="grid">
+          <div class="card">
+            <h2>Last 7 Days</h2>
+            <canvas id="moodTrendChart" aria-label="Mood trend chart" role="img"></canvas>
+          </div>
+
+          <div class="card">
+            <h2>Past 30 Days</h2>
+            <div id="moodHeatmap" class="heatmap" aria-label="Mood calendar heatmap"></div>
+            <div id="moodDayDetails" class="mood-day-details feedback-text"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Wellness Activities -->
+      <section id="wellness" class="view">
+        <h1>Wellness Activities</h1>
+        <p class="subtitle">Gentle tools to help you reset and recharge.</p>
+
+        <div class="grid wellness-grid">
+          <div class="card wellness-card" data-activity="breathing">
+            <div class="activity-icon" aria-hidden="true">🫁</div>
+            <h2>Breathing Exercise</h2>
+            <p class="activity-meta">Duration: 2–5 minutes</p>
+            <button id="startBreathingActivityBtn" class="primary-btn">Start</button>
+          </div>
+
+          <div class="card wellness-card" data-activity="meditation">
+            <div class="activity-icon" aria-hidden="true">🧘</div>
+            <h2>Quick Meditation</h2>
+            <p class="activity-meta">Duration: 2 minutes</p>
+            <button id="startMeditationBtn" class="primary-btn">Start</button>
+          </div>
+
+          <div class="card wellness-card" data-activity="grounding">
+            <div class="activity-icon" aria-hidden="true">🪨</div>
+            <h2>Grounding Exercise</h2>
+            <p class="activity-meta">Duration: 3 minutes</p>
+            <button id="startGroundingBtn" class="primary-btn">Start</button>
+          </div>
+        </div>
+
+        <div id="activityDetails" class="feedback-text"></div>
+      </section>
+
+      <!-- Crisis Detection -->
+      <section id="crisis" class="view">
+        <h1>Crisis Support</h1>
+        <p class="subtitle">Share what's on your mind. We’ll check for signs that you may need extra support.</p>
+
+        <div class="card">
+          <label for="journalInput">Journal space</label>
+          <textarea id="journalInput" rows="6" placeholder="Type whatever you're feeling here..."></textarea>
+          <div class="analysis-controls">
+            <button id="analyzeJournalBtn" class="primary-btn">Analyze for Support</button>
+            <div id="journalSpinner" class="spinner hidden" aria-hidden="true"></div>
+          </div>
+          <div id="journalProgress" class="analysis-progress hidden" aria-hidden="true">
+            <div class="analysis-progress-bar">
+              <div class="analysis-progress-bar-inner"></div>
+            </div>
+          </div>
+          <p id="journalFeedback" class="feedback-text"></p>
+        </div>
+
+        <div class="card">
+          <h2>Recent Journal Check-ins</h2>
+          <div id="journalHistory" class="journal-history"></div>
+        </div>
+
+        <div class="card">
+          <h2>Comfort Message Library</h2>
+          <form id="comfortForm" class="comfort-form">
+            <label>
+              Your first name or nickname (optional)
+              <input type="text" id="comfortSender" placeholder="e.g., Alex" />
+            </label>
+            <label>
+              Upload a comfort audio message
+              <input type="file" id="comfortFile" accept="audio/mp3,audio/mpeg,audio/wav,audio/x-wav,audio/m4a" />
+            </label>
+            <button type="submit" class="secondary-btn">Upload Comfort Message</button>
+          </form>
+          <div id="comfortMessagesList" class="comfort-list"></div>
+        </div>
+      </section>
+
+      <!-- Peer Support -->
+      <section id="peer" class="view">
+        <h1>Anonymous Peer Support</h1>
+        <p class="subtitle">Connect with another student anonymously to listen or be heard.</p>
+
+        <div class="card" id="peerLanding">
+          <div class="peer-roles">
+            <button id="needSupportBtn" class="primary-btn">I Need Support</button>
+            <button id="canHelpBtn" class="secondary-btn">I Can Help Someone</button>
+          </div>
+          <p id="peerStatus" class="feedback-text"></p>
+        </div>
+
+        <div class="card chat-card hidden" id="chatContainer">
+          <div class="chat-header">
+            <span id="chatRoleLabel"></span>
+            <button id="endChatBtn" class="secondary-btn">End Chat</button>
+          </div>
+          <div id="chatMessages" class="chat-messages"></div>
+          <form id="chatForm" class="chat-form">
+            <input type="text" id="chatInput" placeholder="Type a supportive message..." autocomplete="off" />
+            <button type="submit" class="primary-btn">Send</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- Breathing Exercise -->
+      <section id="breathing" class="view">
+        <h1>Box Breathing</h1>
+        <p class="subtitle">Try a simple 4-4-4-4 breathing exercise to reset your nervous system.</p>
+
+        <div class="card breathing-card">
+          <div class="breathing-visual">
+            <div id="breathingCircle" class="breathing-circle"></div>
+            <p id="breathingPhase" class="breathing-phase">Press start to begin</p>
+          </div>
+          <div class="breathing-controls">
+            <button id="startBreathingBtn" class="primary-btn">Start</button>
+            <button id="stopBreathingBtn" class="secondary-btn">Stop</button>
+            <button id="breathingFullscreenBtn" class="secondary-btn">Full screen</button>
+            <button id="toggleMusicBtn" class="secondary-btn">Play calming music</button>
+            <span id="breathingTimer" class="breathing-timer">00</span>
+            <audio id="breathingMusic" loop class="hidden">
+              <source src="https://example.com/calming-music.mp3" type="audio/mpeg" />
+            </audio>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Emergency Modal -->
+    <div id="emergencyModal" class="modal hidden" role="dialog" aria-modal="true">
+      <div class="modal-content">
+        <button class="modal-close" id="closeEmergencyModal">&times;</button>
+        <h2>You matter. Help is available.</h2>
+        <p class="modal-text">We're here for you. You're not alone.</p>
+        <p class="modal-text"><strong>In the United States, you can call or text 988</strong> (Suicide & Crisis Lifeline) any time.</p>
+        <div class="modal-actions">
+          <button id="connectPeerBtn" class="primary-btn" data-target="peer">Connect with Peer Support</button>
+          <button id="playComfortBtn" class="secondary-btn">Listen to Comfort Message</button>
+        </div>
+        <audio id="comfortPlayer" controls class="hidden"></audio>
+      </div>
+    </div>
+
+    <!-- Onboarding Modal -->
+    <div id="onboardingModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="onboardingTitle">
+      <div class="modal-content onboarding-modal">
+        <button class="modal-close" id="closeOnboardingModal">&times;</button>
+        <h2 id="onboardingTitle">Welcome to CampusCare Companion</h2>
+        <p class="modal-text">Here's a quick tour to help you feel at home.</p>
+        <ol class="onboarding-steps">
+          <li class="onboarding-step" data-step="1"><strong>Track mood</strong> - Check in daily to notice patterns.</li>
+          <li class="onboarding-step" data-step="2"><strong>Get support</strong> - Reach out through crisis tools and peers.</li>
+          <li class="onboarding-step" data-step="3"><strong>Stay safe</strong> - Use quick tools when things feel heavy.</li>
+        </ol>
+        <div class="onboarding-indicator">
+          <span class="dot active" data-step-indicator="1"></span>
+          <span class="dot" data-step-indicator="2"></span>
+          <span class="dot" data-step-indicator="3"></span>
+        </div>
+        <div class="modal-actions onboarding-actions">
+          <button id="onboardingSkipBtn" class="secondary-btn">Skip</button>
+          <button id="onboardingNextBtn" class="primary-btn">Next</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <nav class="bottom-nav">
+    <button class="bottom-nav-btn" data-target="dashboard">Home</button>
+    <button class="bottom-nav-btn" data-target="mood">Mood</button>
+    <button class="bottom-nav-btn" data-target="crisis">Crisis</button>
+    <button class="bottom-nav-btn" data-target="wellness">Wellness</button>
+  </nav>
+
+  <script src="app.js"></script>
+</body>
+</html>
