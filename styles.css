@@ -35,6 +35,7 @@ body {
   background: radial-gradient(circle at top left, #fdfbfb 0, var(--neutral) 45%, #e0f3ff 100%);
   color: var(--text-main);
   min-height: 100vh;
+  text-size-adjust: 100%;
 }
 
 body.dark {
@@ -116,6 +117,17 @@ body.dark .app-header {
 .header-actions {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.auth-status {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  background: var(--blue-soft);
+  padding: 6px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
 }
 
 .app-main {
@@ -182,6 +194,11 @@ body.dark .card::before {
   z-index: 1;
 }
 
+.view {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 900px;
+}
+
 .primary-btn,
 .secondary-btn,
 .emergency-btn {
@@ -207,6 +224,15 @@ body.dark .card::before {
 .primary-btn:hover {
   transform: translateY(-1px) scale(1.02);
   box-shadow: 0 10px 24px rgba(74, 144, 226, 0.5);
+}
+
+.primary-btn:disabled,
+.secondary-btn:disabled,
+.emergency-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .secondary-btn {
@@ -283,6 +309,8 @@ input[type="range"]:active::-moz-range-thumb {
 }
 
 input[type="text"],
+input[type="email"],
+input[type="password"],
 select,
 textarea {
   width: 100%;
@@ -295,6 +323,8 @@ textarea {
 }
 
 body.dark input[type="text"],
+body.dark input[type="email"],
+body.dark input[type="password"],
 body.dark select,
 body.dark textarea {
   background: #020617;
@@ -718,6 +748,11 @@ body.dark .chat-messages {
   color: var(--text-main);
 }
 
+.bottom-nav-btn.active-nav {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
 .breathing-fullscreen .breathing-card {
   min-height: calc(100vh - 96px);
   justify-content: center;
@@ -774,6 +809,8 @@ body.dark .chat-messages {
   .app-header {
     flex-wrap: wrap;
     border-radius: 18px;
+    gap: 10px;
+    align-items: flex-start;
   }
 
   .nav-toggle {
@@ -795,11 +832,66 @@ body.dark .chat-messages {
     display: flex;
   }
 
+  .header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .header-actions .secondary-btn,
+  .header-actions .emergency-btn {
+    min-height: 38px;
+    padding: 8px 12px;
+    font-size: 0.82rem;
+  }
+
+  .auth-status {
+    order: 5;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .card {
+    padding: 16px 14px;
+  }
+
+  .modal-content {
+    width: calc(100% - 16px);
+    padding: 18px 14px 14px;
+  }
+
+  .chat-form {
+    flex-direction: column;
+  }
+
+  .chat-form button,
+  .chat-form input {
+    width: 100%;
+  }
+
+  .breathing-controls {
+    width: 100%;
+  }
+
+  .breathing-controls .primary-btn,
+  .breathing-controls .secondary-btn {
+    width: 100%;
+  }
+
   .app-main {
     margin-top: 16px;
   }
 
   h1 {
     font-size: 1.6rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

@@ -23,6 +23,9 @@
         <button class="nav-link" data-target="wellness">Wellness</button>
       </nav>
       <div class="header-actions">
+        <span id="authStatus" class="auth-status">Local mode</span>
+        <button id="authButton" class="secondary-btn">Sign In</button>
+        <button id="syncNowBtn" class="secondary-btn">Sync</button>
         <button id="darkModeToggle" class="secondary-btn">Dark Mode</button>
         <button id="emergencyButton" class="emergency-btn">Emergency</button>
       </div>
@@ -49,6 +52,7 @@
               <p class="feedback-text">Start with your first check-in to unlock insights.</p>
             </div>
             <button id="exportDataBtn" class="secondary-btn">Export My Data</button>
+            <p id="syncStatusText" class="feedback-text"></p>
           </div>
 
           <div class="card">
@@ -286,6 +290,30 @@
       </div>
     </div>
 
+    <!-- Auth Modal -->
+    <div id="authModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="authModalTitle">
+      <div class="modal-content">
+        <button class="modal-close" id="closeAuthModal">&times;</button>
+        <h2 id="authModalTitle">Account</h2>
+        <p class="modal-text">Sign in to back up and sync your entries across devices.</p>
+        <form id="authForm" class="mood-form">
+          <label>
+            Email
+            <input type="email" id="authEmailInput" autocomplete="email" required />
+          </label>
+          <label>
+            Password
+            <input type="password" id="authPasswordInput" minlength="6" autocomplete="current-password" required />
+          </label>
+          <div class="modal-actions">
+            <button type="submit" id="signInSubmitBtn" class="primary-btn">Sign In</button>
+            <button type="button" id="signUpSubmitBtn" class="secondary-btn">Create Account</button>
+          </div>
+          <p id="authFeedback" class="feedback-text"></p>
+        </form>
+      </div>
+    </div>
+
   </div>
 
   <nav class="bottom-nav">
@@ -295,6 +323,8 @@
     <button class="bottom-nav-btn" data-target="wellness">Wellness</button>
   </nav>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

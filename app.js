@@ -10,6 +10,11 @@
     DARK_MODE: 'ccc_dark_mode',
     ONBOARDING_DONE: 'ccc_onboarding_done',
   };
+  const ENTRY_TYPES = {
+    MOOD: 'mood',
+    JOURNAL: 'journal',
+    COMFORT: 'comfort',
+  };
 
   // Utility: localStorage helpers
   function loadJSON(key, fallback) {
@@ -31,18 +36,118 @@
     }
   }
 
+  function createLocalId() {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+      return window.crypto.randomUUID();
+    }
+    return `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  }
+
+  function getLocalKeyForType(type) {
+    if (type === ENTRY_TYPES.MOOD) return STORAGE_KEYS.MOODS;
+    if (type === ENTRY_TYPES.JOURNAL) return STORAGE_KEYS.JOURNAL_ENTRIES;
+    return STORAGE_KEYS.COMFORT_MESSAGES;
+  }
+
+  function normalizeLocalEntry(type, entry) {
+    const normalized = { ...entry };
+    if (!normalized.id) normalized.id = createLocalId();
+    if (!normalized.updatedAt) {
+      normalized.updatedAt =
+        normalized.timestamp || normalized.createdAt || normalized.syncedAt || new Date().toISOString();
+    }
+    if (type === ENTRY_TYPES.MOOD && !normalized.dateKey && normalized.timestamp) {
+      const sourceDate = new Date(normalized.timestamp);
+      const year = sourceDate.getFullYear();
+      const month = String(sourceDate.getMonth() + 1).padStart(2, '0');
+      const day = String(sourceDate.getDate()).padStart(2, '0');
+      normalized.dateKey = `${year}-${month}-${day}`;
+    }
+    return normalized;
+  }
+
+  function ensureIdsForType(type) {
+    const key = getLocalKeyForType(type);
+    const current = loadJSON(key, []);
+    let changed = false;
+    const normalized = current.map((entry) => {
+      const next = normalizeLocalEntry(type, entry);
+      if (!entry.id || !entry.updatedAt || (type === ENTRY_TYPES.MOOD && !entry.dateKey && entry.timestamp)) {
+        changed = true;
+      }
+      return next;
+    });
+    if (changed) {
+      saveJSON(key, normalized);
+    }
+    return normalized;
+  }
+
   // ==== SPA Navigation ====
   const views = document.querySelectorAll('.view');
   const navButtons = document.querySelectorAll('[data-target]');
   const nav = document.querySelector('.nav');
   const navToggle = document.getElementById('navToggle');
+  const authStatus = document.getElementById('authStatus');
+  const authButton = document.getElementById('authButton');
+  const syncNowBtn = document.getElementById('syncNowBtn');
+  const syncStatusText = document.getElementById('syncStatusText');
+  const authModal = document.getElementById('authModal');
+  const closeAuthModal = document.getElementById('closeAuthModal');
+  const authForm = document.getElementById('authForm');
+  const authEmailInput = document.getElementById('authEmailInput');
+  const authPasswordInput = document.getElementById('authPasswordInput');
+  const signUpSubmitBtn = document.getElementById('signUpSubmitBtn');
+  const authFeedback = document.getElementById('authFeedback');
 
   const VIEW_ORDER = ['dashboard', 'mood', 'crisis', 'peer', 'breathing', 'wellness'];
+  const CLOUD_CONFIG = window.CAMPUSCARE_CONFIG || {};
+  const cloudEnabled = Boolean(window.supabase && CLOUD_CONFIG.supabaseUrl && CLOUD_CONFIG.supabaseAnonKey);
+  const cloudClient = cloudEnabled
+    ? window.supabase.createClient(CLOUD_CONFIG.supabaseUrl, CLOUD_CONFIG.supabaseAnonKey)
+    : null;
+  let currentUser = null;
+  let isSyncing = false;
 
   let currentViewId = 'dashboard';
   const initialActiveView = document.querySelector('.view.active-view');
   if (initialActiveView && initialActiveView.id) {
     currentViewId = initialActiveView.id;
+  }
+
+  function setSyncStatus(message, isError) {
+    if (!syncStatusText) return;
+    syncStatusText.textContent = message || '';
+    syncStatusText.style.color = isError ? 'var(--danger)' : 'var(--text-muted)';
+  }
+
+  function updateAuthUI() {
+    if (!authStatus || !authButton || !syncNowBtn) return;
+    if (!cloudEnabled) {
+      authStatus.textContent = 'Local mode';
+      authButton.textContent = 'Setup Cloud';
+      syncNowBtn.disabled = true;
+      return;
+    }
+    if (currentUser) {
+      authStatus.textContent = currentUser.email || 'Signed in';
+      authButton.textContent = 'Sign Out';
+      syncNowBtn.disabled = false;
+    } else {
+      authStatus.textContent = 'Local mode';
+      authButton.textContent = 'Sign In';
+      syncNowBtn.disabled = true;
+    }
+  }
+
+  function openAuthModal() {
+    if (!authModal) return;
+    authModal.classList.remove('hidden');
+  }
+
+  function closeAuthModalUI() {
+    if (!authModal) return;
+    authModal.classList.add('hidden');
   }
 
   function syncActiveNavigation() {
@@ -73,6 +178,9 @@
     nextEl.classList.add('active-view');
     currentViewId = id;
     syncActiveNavigation();
+    if (id === 'mood') {
+      renderMoodTrendChart();
+    }
   }
 
   navButtons.forEach((btn) => {
@@ -93,6 +201,72 @@
 
   syncActiveNavigation();
 
+  if (closeAuthModal) {
+    closeAuthModal.addEventListener('click', closeAuthModalUI);
+  }
+
+  if (authButton) {
+    authButton.addEventListener('click', async () => {
+      if (!cloudEnabled) {
+        setSyncStatus('Add Supabase keys in config.js to enable cloud sync.', true);
+        return;
+      }
+      if (currentUser) {
+        try {
+          await signOutCloud();
+        } catch (error) {
+          console.error('Failed to sign out', error);
+          setSyncStatus('Sign out failed. Try again.', true);
+        }
+      } else {
+        openAuthModal();
+      }
+    });
+  }
+
+  if (syncNowBtn) {
+    syncNowBtn.addEventListener('click', () => {
+      runCloudSync('manual').catch((error) => {
+        console.error('Manual sync failed', error);
+      });
+    });
+  }
+
+  if (authForm && authEmailInput && authPasswordInput) {
+    authForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = authEmailInput.value.trim();
+      const password = authPasswordInput.value.trim();
+      if (!email || !password) return;
+      try {
+        await signInWithEmail(email, password);
+        if (authFeedback) authFeedback.textContent = '';
+        closeAuthModalUI();
+      } catch (error) {
+        console.error('Sign in failed', error);
+        if (authFeedback) authFeedback.textContent = 'Sign in failed. Check your email/password.';
+      }
+    });
+  }
+
+  if (signUpSubmitBtn && authEmailInput && authPasswordInput) {
+    signUpSubmitBtn.addEventListener('click', async () => {
+      const email = authEmailInput.value.trim();
+      const password = authPasswordInput.value.trim();
+      if (!email || !password) {
+        if (authFeedback) authFeedback.textContent = 'Enter email and password first.';
+        return;
+      }
+      try {
+        await signUpWithEmail(email, password);
+        if (authFeedback) authFeedback.textContent = 'Account created. Check your email confirmation if prompted.';
+      } catch (error) {
+        console.error('Sign up failed', error);
+        if (authFeedback) authFeedback.textContent = 'Sign up failed. Try a different email.';
+      }
+    });
+  }
+
   // Swipe gestures for mobile
   let touchStartX = null;
   let touchStartY = null;
@@ -101,7 +275,7 @@
     const touch = e.touches[0];
     touchStartX = touch.clientX;
     touchStartY = touch.clientY;
-  });
+  }, { passive: true });
 
   document.addEventListener('touchend', (e) => {
     if (touchStartX === null || touchStartY === null) return;
@@ -121,7 +295,7 @@
     } else if (dx > 0 && currentIndex > 0) {
       showView(VIEW_ORDER[currentIndex - 1]);
     }
-  });
+  }, { passive: true });
 
   // ==== Dark Mode ====
   const darkToggle = document.getElementById('darkModeToggle');
@@ -219,20 +393,215 @@
     return `${year}-${month}-${day}`;
   }
 
+  function getAllEntriesByType(type) {
+    const key = getLocalKeyForType(type);
+    const entries = loadJSON(key, []);
+    return entries.map((entry) => normalizeLocalEntry(type, entry));
+  }
+
+  function saveAllEntriesByType(type, entries) {
+    const key = getLocalKeyForType(type);
+    const normalized = entries.map((entry) => normalizeLocalEntry(type, entry));
+    saveJSON(key, normalized);
+  }
+
+  function mergeByLatest(localEntries, cloudEntries, type) {
+    const mergedMap = new Map();
+    [...localEntries, ...cloudEntries].forEach((entry) => {
+      const normalized = normalizeLocalEntry(type, entry);
+      const existing = mergedMap.get(normalized.id);
+      if (!existing) {
+        mergedMap.set(normalized.id, normalized);
+        return;
+      }
+      const existingTime = new Date(existing.updatedAt || existing.timestamp || existing.createdAt || 0).getTime();
+      const currentTime = new Date(
+        normalized.updatedAt || normalized.timestamp || normalized.createdAt || 0
+      ).getTime();
+      if (currentTime >= existingTime) {
+        mergedMap.set(normalized.id, normalized);
+      }
+    });
+    return [...mergedMap.values()].sort((a, b) => {
+      const aTime = new Date(a.timestamp || a.createdAt || a.updatedAt || 0).getTime();
+      const bTime = new Date(b.timestamp || b.createdAt || b.updatedAt || 0).getTime();
+      return aTime - bTime;
+    });
+  }
+
+  async function upsertEntryToCloud(type, entry) {
+    if (!cloudClient || !currentUser) return;
+    const normalized = normalizeLocalEntry(type, entry);
+    const { error } = await cloudClient.from('user_entries').upsert(
+      {
+        user_id: currentUser.id,
+        entry_type: type,
+        entry_id: normalized.id,
+        payload: normalized,
+        updated_at: normalized.updatedAt,
+      },
+      { onConflict: 'user_id,entry_type,entry_id' }
+    );
+    if (error) throw error;
+  }
+
+  async function pushLocalEntriesToCloud() {
+    if (!cloudClient || !currentUser) return;
+    const rows = [];
+    [ENTRY_TYPES.MOOD, ENTRY_TYPES.JOURNAL, ENTRY_TYPES.COMFORT].forEach((type) => {
+      const items = getAllEntriesByType(type);
+      items.forEach((entry) => {
+        rows.push({
+          user_id: currentUser.id,
+          entry_type: type,
+          entry_id: entry.id,
+          payload: entry,
+          updated_at: entry.updatedAt,
+        });
+      });
+    });
+    if (!rows.length) return;
+    const { error } = await cloudClient.from('user_entries').upsert(rows, {
+      onConflict: 'user_id,entry_type,entry_id',
+    });
+    if (error) throw error;
+  }
+
+  async function pullCloudEntries() {
+    if (!cloudClient || !currentUser) return;
+    const { data, error } = await cloudClient
+      .from('user_entries')
+      .select('entry_type, entry_id, payload, updated_at')
+      .eq('user_id', currentUser.id);
+    if (error) throw error;
+
+    const grouped = {
+      [ENTRY_TYPES.MOOD]: [],
+      [ENTRY_TYPES.JOURNAL]: [],
+      [ENTRY_TYPES.COMFORT]: [],
+    };
+    (data || []).forEach((row) => {
+      const type = row.entry_type;
+      if (!grouped[type]) return;
+      const payload = {
+        ...(row.payload || {}),
+        id: row.entry_id,
+        updatedAt: row.updated_at || (row.payload && row.payload.updatedAt) || new Date().toISOString(),
+      };
+      grouped[type].push(payload);
+    });
+
+    Object.keys(grouped).forEach((type) => {
+      const localEntries = getAllEntriesByType(type);
+      const merged = mergeByLatest(localEntries, grouped[type], type);
+      saveAllEntriesByType(type, merged);
+    });
+  }
+
+  async function runCloudSync(reason) {
+    if (!cloudEnabled || !currentUser || isSyncing) return;
+    isSyncing = true;
+    setSyncStatus(reason ? `Syncing (${reason})...` : 'Syncing...', false);
+    try {
+      ensureIdsForType(ENTRY_TYPES.MOOD);
+      ensureIdsForType(ENTRY_TYPES.JOURNAL);
+      ensureIdsForType(ENTRY_TYPES.COMFORT);
+      await pushLocalEntriesToCloud();
+      await pullCloudEntries();
+      setSyncStatus(`Synced at ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`, false);
+      renderTodayMoodStatus();
+      renderMoodHeatmap();
+      if (currentViewId === 'mood') renderMoodTrendChart();
+      renderProgressSnapshot();
+      renderJournalHistory();
+      renderComfortMessages();
+    } catch (error) {
+      console.error('Cloud sync failed', error);
+      setSyncStatus('Sync failed. Check backend setup.', true);
+    } finally {
+      isSyncing = false;
+    }
+  }
+
+  async function signInWithEmail(email, password) {
+    if (!cloudClient) return;
+    const { error } = await cloudClient.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+  }
+
+  async function signUpWithEmail(email, password) {
+    if (!cloudClient) return;
+    const { error } = await cloudClient.auth.signUp({ email, password });
+    if (error) throw error;
+  }
+
+  async function signOutCloud() {
+    if (!cloudClient) return;
+    const { error } = await cloudClient.auth.signOut();
+    if (error) throw error;
+  }
+
+  async function initializeCloudAuth() {
+    ensureIdsForType(ENTRY_TYPES.MOOD);
+    ensureIdsForType(ENTRY_TYPES.JOURNAL);
+    ensureIdsForType(ENTRY_TYPES.COMFORT);
+    updateAuthUI();
+    if (!cloudEnabled) {
+      setSyncStatus('Cloud sync not configured yet.', false);
+      return;
+    }
+
+    const { data } = await cloudClient.auth.getSession();
+    currentUser = data && data.session && data.session.user ? data.session.user : null;
+    updateAuthUI();
+    if (currentUser) {
+      await runCloudSync('session restore');
+    } else {
+      setSyncStatus('Sign in to enable cloud backup.', false);
+    }
+
+    cloudClient.auth.onAuthStateChange(async (_event, session) => {
+      currentUser = session && session.user ? session.user : null;
+      updateAuthUI();
+      if (currentUser) {
+        await runCloudSync('login');
+      } else {
+        setSyncStatus('Signed out. Local mode active.', false);
+      }
+    });
+  }
+
   function loadMoods() {
-    return loadJSON(STORAGE_KEYS.MOODS, []);
+    return getAllEntriesByType(ENTRY_TYPES.MOOD);
   }
 
   function saveMoodEntry(entry) {
     const moods = loadMoods();
-    moods.push(entry);
+    const normalized = normalizeLocalEntry(ENTRY_TYPES.MOOD, entry);
+    moods.push(normalized);
     saveJSON(STORAGE_KEYS.MOODS, moods);
+    upsertEntryToCloud(ENTRY_TYPES.MOOD, normalized).catch((error) => {
+      console.error('Failed to sync mood entry', error);
+    });
   }
 
   function getLatestMoodForDay(dayKey) {
     const moods = loadMoods();
-    const forDay = moods.filter((m) => m.dateKey === dayKey);
-    return forDay.length ? forDay[forDay.length - 1] : null;
+    const byDay = new Map();
+    moods.forEach((entry) => {
+      if (!entry.dateKey) return;
+      const existing = byDay.get(entry.dateKey);
+      if (!existing) {
+        byDay.set(entry.dateKey, entry);
+        return;
+      }
+      const existingTime = new Date(existing.timestamp || existing.updatedAt || 0).getTime();
+      const currentTime = new Date(entry.timestamp || entry.updatedAt || 0).getTime();
+      if (currentTime >= existingTime) {
+        byDay.set(entry.dateKey, entry);
+      }
+    });
+    return byDay.get(dayKey) || null;
   }
 
   function renderTodayMoodStatus() {
@@ -346,6 +715,20 @@
   function renderMoodHeatmap() {
     if (!moodHeatmap) return;
     const moods = loadMoods();
+    const latestByDay = new Map();
+    moods.forEach((entry) => {
+      if (!entry.dateKey) return;
+      const existing = latestByDay.get(entry.dateKey);
+      if (!existing) {
+        latestByDay.set(entry.dateKey, entry);
+        return;
+      }
+      const existingTime = new Date(existing.timestamp || existing.updatedAt || 0).getTime();
+      const currentTime = new Date(entry.timestamp || entry.updatedAt || 0).getTime();
+      if (currentTime >= existingTime) {
+        latestByDay.set(entry.dateKey, entry);
+      }
+    });
     const today = new Date();
     const days = [];
 
@@ -353,7 +736,7 @@
       const d = new Date(today);
       d.setDate(today.getDate() - i);
       const key = getTodayKey(d);
-      const entry = getLatestMoodForDay(key);
+      const entry = latestByDay.get(key) || null;
       days.push({ date: d, entry });
     }
 
@@ -401,7 +784,24 @@
     if (typeof window.Chart === 'undefined') {
       return;
     }
+    if (currentViewId !== 'mood') return;
     const ctx = moodTrendCanvas.getContext('2d');
+    if (!ctx) return;
+    const moods = loadMoods();
+    const latestByDay = new Map();
+    moods.forEach((entry) => {
+      if (!entry.dateKey) return;
+      const existing = latestByDay.get(entry.dateKey);
+      if (!existing) {
+        latestByDay.set(entry.dateKey, entry);
+        return;
+      }
+      const existingTime = new Date(existing.timestamp || existing.updatedAt || 0).getTime();
+      const currentTime = new Date(entry.timestamp || entry.updatedAt || 0).getTime();
+      if (currentTime >= existingTime) {
+        latestByDay.set(entry.dateKey, entry);
+      }
+    });
     const today = new Date();
     const labels = [];
     const data = [];
@@ -410,7 +810,7 @@
       const d = new Date(today);
       d.setDate(today.getDate() - i);
       const key = getTodayKey(d);
-      const entry = getLatestMoodForDay(key);
+      const entry = latestByDay.get(key) || null;
       labels.push(d.toLocaleDateString([], { month: 'short', day: 'numeric' }));
       data.push(entry ? entry.mood : null);
     }
@@ -468,6 +868,7 @@
       renderMoodTrendChart();
       renderProgressSnapshot();
       renderMoodInsight(entry);
+      if (moodNoteInput) moodNoteInput.value = '';
     });
   }
 
@@ -522,11 +923,12 @@
   const journalHistory = document.getElementById('journalHistory');
 
   function loadJournalEntries() {
-    return loadJSON(STORAGE_KEYS.JOURNAL_ENTRIES, []);
+    return getAllEntriesByType(ENTRY_TYPES.JOURNAL);
   }
 
   function saveJournalEntries(entries) {
-    saveJSON(STORAGE_KEYS.JOURNAL_ENTRIES, entries);
+    const normalized = entries.map((entry) => normalizeLocalEntry(ENTRY_TYPES.JOURNAL, entry));
+    saveJSON(STORAGE_KEYS.JOURNAL_ENTRIES, normalized);
   }
 
   function renderJournalHistory() {
@@ -605,22 +1007,42 @@
       setTimeout(() => {
         const crisis = checkForCrisis(text);
         const entries = loadJournalEntries();
+        let latestEntry;
         if (crisis) {
           journalFeedback.textContent =
             "We noticed some phrases that suggest you might be going through a really hard time. You're not alone, and support is available.";
           journalInput.classList.add('crisis-detected');
           journalFeedback.classList.remove('journal-safe');
-          entries.push({ text, level: 'High support recommended', timestamp: new Date().toISOString() });
+          latestEntry = {
+            id: createLocalId(),
+            text,
+            level: 'High support recommended',
+            timestamp: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          entries.push(latestEntry);
           openEmergencyModal();
         } else {
           journalFeedback.textContent =
             '✓ Entry reviewed. Thank you for sharing. Your feelings matter. If you ever feel overwhelmed, please reach out to someone you trust.';
           journalInput.classList.remove('crisis-detected');
           journalFeedback.classList.add('journal-safe');
-          entries.push({ text, level: 'Supportive check-in', timestamp: new Date().toISOString() });
+          latestEntry = {
+            id: createLocalId(),
+            text,
+            level: 'Supportive check-in',
+            timestamp: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          entries.push(latestEntry);
         }
 
         saveJournalEntries(entries);
+        if (latestEntry) {
+          upsertEntryToCloud(ENTRY_TYPES.JOURNAL, latestEntry).catch((error) => {
+            console.error('Failed to sync journal entry', error);
+          });
+        }
         renderJournalHistory();
 
         if (journalProgress) journalProgress.classList.add('hidden');
@@ -658,11 +1080,12 @@
   const playComfortBtn = document.getElementById('playComfortBtn');
 
   function loadComfortMessages() {
-    return loadJSON(STORAGE_KEYS.COMFORT_MESSAGES, []);
+    return getAllEntriesByType(ENTRY_TYPES.COMFORT);
   }
 
   function saveComfortMessages(messages) {
-    saveJSON(STORAGE_KEYS.COMFORT_MESSAGES, messages);
+    const normalized = messages.map((entry) => normalizeLocalEntry(ENTRY_TYPES.COMFORT, entry));
+    saveJSON(STORAGE_KEYS.COMFORT_MESSAGES, normalized);
   }
 
   function renderComfortMessages() {
@@ -716,8 +1139,18 @@
       try {
         const dataUrl = await fileToDataUrl(file);
         const messages = loadComfortMessages();
-        messages.push({ sender, dataUrl, createdAt: new Date().toISOString() });
+        const next = {
+          id: createLocalId(),
+          sender,
+          dataUrl,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        messages.push(next);
         saveComfortMessages(messages);
+        upsertEntryToCloud(ENTRY_TYPES.COMFORT, next).catch((error) => {
+          console.error('Failed to sync comfort message', error);
+        });
         comfortFileInput.value = '';
         renderComfortMessages();
       } catch (err) {
@@ -739,6 +1172,10 @@
 
   renderComfortMessages();
   renderJournalHistory();
+  initializeCloudAuth().catch((error) => {
+    console.error('Cloud auth init failed', error);
+    setSyncStatus('Cloud auth setup failed.', true);
+  });
 
   // ==== Anonymous Peer Support (simple local queue) ====
   const needSupportBtn = document.getElementById('needSupportBtn');
@@ -1059,5 +1496,6 @@
     if (e.key !== 'Escape') return;
     closeEmergencyModal();
     closeOnboarding();
+    closeAuthModalUI();
   });
 })();
